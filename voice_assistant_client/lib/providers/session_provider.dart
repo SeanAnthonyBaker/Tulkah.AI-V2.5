@@ -391,25 +391,33 @@ class SessionNotifier extends StateNotifier<SessionState> {
 
       AnswerEntryModel newAnswer;
       try {
-        newAnswer = await _apiService.continueChat(
+        await _apiService.continueChat(
           sessionId: currentSession.sessionId,
           threadId: currentThreadId,
           e4bTranscript: rawTranscript,
         );
+        final freshSession = await _apiService.getSession(currentSession.sessionId);
+        state = state.copyWith(session: freshSession, isLoading: false);
+        return;
       } catch (e) {
         final activeT = state.activeThread;
         final nextSeq = (activeT?.answers.length ?? 0) + 1;
 
-        String consolidatedText = rawTranscript;
-        if (activeT != null && activeT.answers.isNotEmpty) {
-          final priorOutput = activeT.answers.last.gemma12bOutput;
-          consolidatedText = "$priorOutput $rawTranscript";
-        }
-
         newAnswer = AnswerEntryModel(
           seq: nextSeq,
           e4bTranscript: rawTranscript,
-          gemma12bOutput: consolidatedText,
+          gemma12bOutput: rawTranscript,
+          localLanguageBaseline: LocalLanguageBaselineModel(
+            languageCode: state.selectedLanguage,
+            transcript: rawTranscript,
+            status: 'COMPILED',
+          ),
+          corporateEnglishBaseline: CorporateEnglishBaselineModel(
+            languageCode: 'en-US',
+            transcript: rawTranscript,
+            status: 'READY',
+            editable: true,
+          ),
           recordedAt: DateTime.now().toIso8601String(),
         );
       }
@@ -459,36 +467,22 @@ class SessionNotifier extends StateNotifier<SessionState> {
       // 2. Refine transcript and append new answer entry back to the active thread
       AnswerEntryModel newAnswer;
       try {
-        newAnswer = await _apiService.continueChat(
+        await _apiService.continueChat(
           sessionId: currentSession.sessionId,
           threadId: currentThreadId,
           e4bTranscript: rawTranscript,
         );
+        final freshSession = await _apiService.getSession(currentSession.sessionId);
+        state = state.copyWith(session: freshSession, isLoading: false);
+        return;
       } catch (e) {
         final activeT = state.activeThread;
         final nextSeq = (activeT?.answers.length ?? 0) + 1;
 
-        String consolidatedText = rawTranscript;
-        if (activeT != null && activeT.answers.isNotEmpty) {
-          final priorOutput = activeT.answers.last.gemma12bOutput;
-          consolidatedText = "$priorOutput $rawTranscript";
-        }
-
         newAnswer = AnswerEntryModel(
           seq: nextSeq,
           e4bTranscript: rawTranscript,
-          gemma12bOutput: consolidatedText,
-          recordedAt: DateTime.now().toIso8601String(),
-        );
-      }
-
-      // Ensure local language baseline and corporate english baseline are attached on every turn
-      if (newAnswer.localLanguageBaseline == null) {
-        newAnswer = AnswerEntryModel(
-          seq: newAnswer.seq,
-          e4bTranscript: newAnswer.e4bTranscript,
-          gemma12bOutput: newAnswer.gemma12bOutput,
-          ttsAudioPath: newAnswer.ttsAudioPath,
+          gemma12bOutput: rawTranscript,
           localLanguageBaseline: LocalLanguageBaselineModel(
             languageCode: state.selectedLanguage,
             transcript: rawTranscript,
@@ -496,11 +490,11 @@ class SessionNotifier extends StateNotifier<SessionState> {
           ),
           corporateEnglishBaseline: CorporateEnglishBaselineModel(
             languageCode: 'en-US',
-            transcript: newAnswer.gemma12bOutput,
+            transcript: rawTranscript,
             status: 'READY',
             editable: true,
           ),
-          recordedAt: newAnswer.recordedAt,
+          recordedAt: DateTime.now().toIso8601String(),
         );
       }
 
