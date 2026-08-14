@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/session_models.dart';
 import '../providers/playback_provider.dart';
@@ -304,29 +305,57 @@ class AnswerCard extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Icon(Icons.language, color: Colors.white, size: 14),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          answer.localLanguageBaseline != null
-                              ? "PRIMARY: SPOKEN BASELINE [${answer.localLanguageBaseline!.languageCode.toUpperCase()}]"
-                              : "PRIMARY: SPOKEN BASELINE",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                      Expanded(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.language, color: Colors.white, size: 14),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                answer.localLanguageBaseline != null
+                                    ? "PRIMARY: SPOKEN BASELINE [${answer.localLanguageBaseline!.languageCode.toUpperCase()}]"
+                                    : "PRIMARY: SPOKEN BASELINE",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.copy, color: Colors.white, size: 14),
+                        constraints: const BoxConstraints(),
+                        padding: EdgeInsets.zero,
+                        tooltip: "Copy Spoken Baseline to Clipboard for MS Teams",
+                        onPressed: () {
+                          final textToCopy = answer.localLanguageBaseline != null && answer.localLanguageBaseline!.transcript.isNotEmpty
+                              ? answer.localLanguageBaseline!.transcript
+                              : answer.e4bTranscript;
+                          if (textToCopy.isNotEmpty) {
+                            Clipboard.setData(ClipboardData(text: textToCopy));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("📋 Spoken Baseline copied to clipboard! Ready to paste into MS Teams."),
+                                backgroundColor: Color(0xFF0284C7),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 10),
-                Text(
+                SelectableText(
                   answer.localLanguageBaseline != null && answer.localLanguageBaseline!.transcript.isNotEmpty
                       ? answer.localLanguageBaseline!.transcript
                       : (answer.e4bTranscript.isNotEmpty ? answer.e4bTranscript : "No transcript recorded."),
@@ -357,25 +386,53 @@ class AnswerCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  children: const [
-                    Icon(Icons.lock, color: Color(0xFF64748B), size: 13),
-                    SizedBox(width: 6),
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
                     Expanded(
-                      child: Text(
-                        "SECONDARY: CORPORATE ENGLISH REFINEMENT",
-                        style: TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                      child: Row(
+                        children: const [
+                          Icon(Icons.lock, color: Color(0xFF64748B), size: 13),
+                          SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              "SECONDARY: CORPORATE ENGLISH REFINEMENT",
+                              style: TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.copy, color: Color(0xFF38BDF8), size: 14),
+                      constraints: const BoxConstraints(),
+                      padding: EdgeInsets.zero,
+                      tooltip: "Copy Corporate English to Clipboard for MS Teams",
+                      onPressed: () {
+                        final textToCopy = answer.corporateEnglishBaseline != null && answer.corporateEnglishBaseline!.transcript.isNotEmpty
+                            ? answer.corporateEnglishBaseline!.transcript
+                            : answer.gemma12bOutput;
+                        if (textToCopy.isNotEmpty) {
+                          Clipboard.setData(ClipboardData(text: textToCopy));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("📋 Corporate English copied to clipboard! Ready to paste into MS Teams."),
+                              backgroundColor: Color(0xFF0284C7),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(
+                SelectableText(
                   answer.corporateEnglishBaseline != null && answer.corporateEnglishBaseline!.transcript.isNotEmpty
                       ? answer.corporateEnglishBaseline!.transcript
                       : (answer.gemma12bOutput.isNotEmpty ? answer.gemma12bOutput : "Awaiting English translation..."),
