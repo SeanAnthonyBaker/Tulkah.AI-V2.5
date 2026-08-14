@@ -16,6 +16,53 @@ class Gemma12BService:
         self.endpoint = os.getenv("GEMMA12B_ENDPOINT", "")
         self.api_key = os.getenv("GEMMA12B_API_KEY", "")
 
+    def _translate_to_corporate_english(self, text: str, question_text: str = "") -> str:
+        """
+        Calls local Gemma 12B model daemon on http://localhost:8000/api/query
+        to translate non-English or raw spoken transcripts into professional Corporate English.
+        """
+        import requests, json
+        if not text.strip():
+            return ""
+
+        prompt = (
+            f"You are a professional corporate executive translator. "
+            f"Translate the following spoken response into clear, fluent, professional Corporate English. "
+            f"Question Context: '{question_text}'. "
+            f"Spoken Input: '{text}'. "
+            f"Output ONLY the translated Corporate English response, with no intro or explanation."
+        )
+
+        try:
+            resp = requests.post(
+                "http://localhost:8000/api/query",
+                json={
+                    "prompt": prompt,
+                    "model": "gemma-4-12b",
+                    "language": "en"
+                },
+                timeout=12,
+                stream=True
+            )
+            tokens = []
+            for line in resp.iter_lines():
+                if line and line.startswith(b"data: ") and not line.endswith(b"[DONE]"):
+                    try:
+                        data_obj = json.loads(line.decode("utf-8").replace("data: ", ""))
+                        if "token" in data_obj:
+                            tokens.append(data_obj["token"])
+                    except Exception:
+                        pass
+            
+            translated = "".join(tokens).strip()
+            if translated:
+                logger.info(f"Gemma 12B Translation Success: '{text[:40]}...' -> '{translated[:40]}...'")
+                return translated
+        except Exception as e:
+            logger.warning(f"Local Gemma 12B translation query error: {e}")
+
+        return text
+
     def refine_input(
         self,
         question_text: str,
@@ -24,18 +71,21 @@ class Gemma12BService:
     ) -> str:
         """
         Integrate new transcript with question context and prior answers using Gemma 4 12B logic.
-        Preserves exact meaning, tone, and phrasing, smoothly integrating new content without duplication.
+        Translates non-English transcripts into Corporate English while preserving prior history.
         """
         raw_text = new_transcript.strip()
         if not raw_text:
             return ""
+
+        # Perform Gemma 12B Corporate English translation on new transcript
+        english_translated = self._translate_to_corporate_english(raw_text, question_text)
 
         prior_context = []
         for ans in prior_answers:
             if ans.gemma12b_output:
                 prior_context.append(ans.gemma12b_output)
 
-        cleaned = raw_text
+        cleaned = english_translated
         for filler in [" uh ", " um ", " Uh ", " Um ", " uh,", " um,"]:
             cleaned = cleaned.replace(filler, " ")
         
@@ -47,7 +97,6 @@ class Gemma12BService:
 
         if prior_context:
             latest_prior = prior_context[-1]
-            # Avoid duplicate concatenation if latest_prior already ends with cleaned snippet
             if cleaned.lower() in latest_prior.lower():
                 refined_result = latest_prior
             else:
@@ -55,7 +104,7 @@ class Gemma12BService:
         else:
             refined_result = cleaned
 
-        logger.info(f"Gemma 12B Refined Input: '{raw_text}' -> '{refined_result}'")
+        logger.info(f"Gemma 12B Refined Output (Corporate English): '{raw_text}' -> '{refined_result}'")
         return refined_result
 
     def consolidate_appends(

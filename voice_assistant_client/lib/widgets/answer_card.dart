@@ -357,13 +357,16 @@ class AnswerCard extends ConsumerWidget {
                   children: const [
                     Icon(Icons.lock, color: Color(0xFF64748B), size: 13),
                     SizedBox(width: 6),
-                    Text(
-                      "SECONDARY: CORPORATE ENGLISH REFINEMENT (READ-ONLY)",
-                      style: TextStyle(
-                        color: Color(0xFF64748B),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
+                    Expanded(
+                      child: Text(
+                        "SECONDARY: CORPORATE ENGLISH REFINEMENT",
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
