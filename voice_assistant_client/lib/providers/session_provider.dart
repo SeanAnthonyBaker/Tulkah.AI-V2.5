@@ -18,7 +18,7 @@ class SessionState {
   SessionState({
     this.session,
     this.activeThreadId = 'thr_101',
-    this.selectedLanguage = 'auto',
+    this.selectedLanguage = 'en',
     this.isLoading = false,
     this.errorMessage,
   });

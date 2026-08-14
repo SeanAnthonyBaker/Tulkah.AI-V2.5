@@ -7,17 +7,17 @@ import '../widgets/answer_card.dart';
 import '../widgets/hold_to_record_button.dart';
 
 const Map<String, String> interviewLanguages = {
-  'auto': '🌐 Auto-Detect',
-  'ru': '🇷🇺 Russian (Русский)',
   'en': '🇬🇧 English',
+  'de': '🇩🇪 German (Deutsch)',
+  'ru': '🇷🇺 Russian (Русский)',
   'es': '🇪🇸 Spanish (Español)',
   'fr': '🇫🇷 French (Français)',
-  'de': '🇩🇪 German (Deutsch)',
   'zh': '🇨🇳 Mandarin (中文)',
   'ar': '🇸🇦 Arabic (العربية)',
   'pt': '🇵🇹 Portuguese (Português)',
   'hi': '🇮🇳 Hindi (हिन्दी)',
   'sw': '🇰🇪 Swahili (Kiswahili)',
+  'auto': '🌐 Auto-Detect',
 };
 
 class HomeScreen extends ConsumerStatefulWidget {
