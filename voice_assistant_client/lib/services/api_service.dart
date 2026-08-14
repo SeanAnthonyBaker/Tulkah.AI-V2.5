@@ -98,12 +98,17 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
-        return jsonBody['transcript'] ?? 'Audio input recorded.';
+        final transcript = jsonBody['transcript'] as String?;
+        if (transcript != null && transcript.trim().isNotEmpty && transcript != 'Voice input recorded.') {
+          return transcript.trim();
+        }
+        throw Exception('No spoken words detected in audio recording');
       } else {
-        return 'Audio input recorded.';
+        throw Exception('Server error during transcription (${response.statusCode})');
       }
     } catch (e) {
-      return 'Audio input recorded.';
+      debugPrint('transcribeAudioFile error: $e');
+      rethrow;
     }
   }
 

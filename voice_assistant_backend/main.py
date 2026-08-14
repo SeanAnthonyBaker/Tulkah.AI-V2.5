@@ -209,13 +209,16 @@ async def transcribe_audio(file: UploadFile = File(...)):
         text = " ".join([segment.text for segment in segments]).strip()
 
         if not text:
-            text = "Voice input recorded."
+            logger.warning("Whisper transcribed audio but detected zero speech tokens.")
+            raise HTTPException(status_code=400, detail="No speech detected in audio recording.")
 
-        logger.info(f"Whisper Transcribed Audio Success: '{text}'")
-        return {"status": "success", "transcript": text}
+        logger.info(f"Whisper Transcribed Audio Success ({info.language if hasattr(info, 'language') else 'auto'}): '{text}'")
+        return {"status": "success", "transcript": text, "language": info.language if hasattr(info, 'language') else "auto"}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Whisper Audio Transcription Error: {e}")
-        return {"status": "error", "transcript": f"Transcription error: {e}"}
+        raise HTTPException(status_code=500, detail=f"Transcription error: {e}")
     finally:
         if os.path.exists(temp_path):
             try:
