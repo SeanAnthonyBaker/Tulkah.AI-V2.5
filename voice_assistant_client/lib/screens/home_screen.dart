@@ -17,7 +17,6 @@ const Map<String, String> interviewLanguages = {
   'pt': '🇵🇹 Portuguese (Português)',
   'hi': '🇮🇳 Hindi (हिन्दी)',
   'sw': '🇰🇪 Swahili (Kiswahili)',
-  'auto': '🌐 Auto-Detect',
 };
 
 class HomeScreen extends ConsumerStatefulWidget {
