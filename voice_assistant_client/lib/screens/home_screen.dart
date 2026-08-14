@@ -330,39 +330,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                       const SizedBox(width: 8),
 
-                      // Button 2: Consolidate Button (Reworks random appends into a unified baseline)
-                      ElevatedButton.icon(
-                        onPressed: answers.isNotEmpty
-                            ? () {
-                                playbackNotifier.stopPlayback();
-                                sessionNotifier.consolidateCurrentAnswers();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text("✨ Gemma 12B consolidated random appends into a unified baseline!"),
-                                    backgroundColor: Color(0xFF7C3AED),
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
-                              }
-                            : null,
-                        icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 15),
-                        label: const Text(
-                          "Consolidate",
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Colors.white, letterSpacing: 0.3),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF7C3AED),
-                          disabledBackgroundColor: const Color(0xFF1E293B),
-                          disabledForegroundColor: const Color(0xFF64748B),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            side: const BorderSide(color: Color(0xFFC084FC), width: 1.2),
-                          ),
-                          elevation: 3,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
+
 
                       // Button 3: Clear Button
                       ElevatedButton.icon(

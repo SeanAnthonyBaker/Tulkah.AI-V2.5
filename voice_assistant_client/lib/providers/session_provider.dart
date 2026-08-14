@@ -482,6 +482,28 @@ class SessionNotifier extends StateNotifier<SessionState> {
         );
       }
 
+      // Ensure local language baseline and corporate english baseline are attached on every turn
+      if (newAnswer.localLanguageBaseline == null) {
+        newAnswer = AnswerEntryModel(
+          seq: newAnswer.seq,
+          e4bTranscript: newAnswer.e4bTranscript,
+          gemma12bOutput: newAnswer.gemma12bOutput,
+          ttsAudioPath: newAnswer.ttsAudioPath,
+          localLanguageBaseline: LocalLanguageBaselineModel(
+            languageCode: state.selectedLanguage,
+            transcript: rawTranscript,
+            status: 'COMPILED',
+          ),
+          corporateEnglishBaseline: CorporateEnglishBaselineModel(
+            languageCode: 'en-US',
+            transcript: newAnswer.gemma12bOutput,
+            status: 'READY',
+            editable: true,
+          ),
+          recordedAt: newAnswer.recordedAt,
+        );
+      }
+
       final updatedThreads = currentSession.questionThreads.map((t) {
         if (t.threadId == currentThreadId) {
           final updatedAnswers = List<AnswerEntryModel>.from(t.answers)..add(newAnswer);
@@ -504,50 +526,6 @@ class SessionNotifier extends StateNotifier<SessionState> {
         isLoading: false,
         errorMessage: 'Error processing mobile voice input: $e',
       );
-    }
-  }
-
-  Future<void> consolidateCurrentAnswers() async {
-    final currentSession = state.session;
-    final currentThreadId = state.activeThreadId;
-    if (currentSession == null) return;
-
-    state = state.copyWith(isLoading: true, errorMessage: null);
-
-    try {
-      final updatedSession = await _apiService.consolidateThread(currentSession.sessionId, currentThreadId);
-      state = state.copyWith(session: updatedSession, isLoading: false);
-    } catch (e) {
-      // Local fallback consolidation logic
-      final activeT = state.activeThread;
-      if (activeT != null && activeT.answers.isNotEmpty) {
-        final allTexts = activeT.answers.map((a) => a.e4bTranscript).join(" ");
-        final nextSeq = activeT.answers.length + 1;
-        final consolidatedEntry = AnswerEntryModel(
-          seq: nextSeq,
-          e4bTranscript: "[Consolidated Baseline] $allTexts",
-          gemma12bOutput: allTexts,
-          recordedAt: DateTime.now().toIso8601String(),
-        );
-
-        final updatedThreads = currentSession.questionThreads.map((t) {
-          if (t.threadId == currentThreadId) {
-            final updatedAnswers = List<AnswerEntryModel>.from(t.answers)..add(consolidatedEntry);
-            return t.copyWith(answers: updatedAnswers);
-          }
-          return t;
-        }).toList();
-
-        state = state.copyWith(
-          session: SessionModel(
-            sessionId: currentSession.sessionId,
-            questionThreads: updatedThreads,
-          ),
-          isLoading: false,
-        );
-      } else {
-        state = state.copyWith(isLoading: false);
-      }
     }
   }
 }

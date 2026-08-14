@@ -63,5 +63,7 @@ class ChatContinueResponse(BaseModel):
     seq: int
     e4b_transcript: str
     gemma12b_output: str
+    local_language_baseline: Optional[LocalLanguageBaseline] = None
+    corporate_english_baseline: Optional[CorporateEnglishBaseline] = None
     recorded_at: str
 

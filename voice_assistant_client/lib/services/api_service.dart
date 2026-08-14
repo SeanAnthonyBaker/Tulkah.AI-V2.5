@@ -172,21 +172,7 @@ class ApiService {
     }
   }
 
-  Future<SessionModel> consolidateThread(String sessionId, String threadId) async {
-    final response = await http
-        .post(
-          Uri.parse('$baseUrl/api/v1/session/$sessionId/thread/$threadId/consolidate'),
-          headers: {'Content-Type': 'application/json'},
-        )
-        .timeout(const Duration(seconds: 15));
 
-    if (response.statusCode == 200) {
-      final jsonBody = json.decode(response.body);
-      return SessionModel.fromJson(jsonBody);
-    } else {
-      throw Exception('Consolidate thread failed: ${response.statusCode}');
-    }
-  }
 
   Future<String> synthesizeTts(String threadId, String text) async {
     try {

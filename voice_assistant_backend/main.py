@@ -250,11 +250,25 @@ def continue_chat(req: ChatContinueRequest):
             new_transcript=req.e4b_transcript
         )
 
+        loc_baseline = LocalLanguageBaseline(
+            language_code="auto",
+            transcript=req.e4b_transcript,
+            status="COMPILED"
+        )
+        corp_baseline = CorporateEnglishBaseline(
+            language_code="en-US",
+            transcript=refined_output,
+            status="READY",
+            editable=True
+        )
+
         new_answer = session_manager.add_answer(
             session_id=req.session_id,
             thread_id=req.thread_id,
             e4b_transcript=req.e4b_transcript,
-            gemma12b_output=refined_output
+            gemma12b_output=refined_output,
+            local_baseline=loc_baseline,
+            corporate_baseline=corp_baseline
         )
 
         return ChatContinueResponse(
@@ -263,6 +277,8 @@ def continue_chat(req: ChatContinueRequest):
             seq=new_answer.seq,
             e4b_transcript=new_answer.e4b_transcript,
             gemma12b_output=new_answer.gemma12b_output,
+            local_language_baseline=new_answer.local_language_baseline,
+            corporate_english_baseline=new_answer.corporate_english_baseline,
             recorded_at=new_answer.recorded_at
         )
     except HTTPException:
@@ -271,19 +287,7 @@ def continue_chat(req: ChatContinueRequest):
         logger.error(f"Error processing chat continue: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/v1/session/{session_id}/thread/{thread_id}/consolidate", response_model=Session)
-def consolidate_thread(session_id: str, thread_id: str):
-    """
-    Reworks and consolidates random appends/snippets into a unified, structured baseline thought.
-    """
-    try:
-        return session_manager.consolidate_question_thread(session_id, thread_id, gemma12b_service)
-    except Exception as e:
-        logger.error(f"Error consolidating thread {thread_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
-

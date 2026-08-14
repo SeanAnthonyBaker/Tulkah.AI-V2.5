@@ -270,7 +270,7 @@ class SessionManager:
 
             return Session(session_id=session_id, question_threads=threads)
 
-    def add_answer(self, session_id: str, thread_id: str, e4b_transcript: str, gemma12b_output: str, local_baseline: Optional[LocalLanguageBaseline] = None) -> AnswerEntry:
+    def add_answer(self, session_id: str, thread_id: str, e4b_transcript: str, gemma12b_output: str, local_baseline: Optional[LocalLanguageBaseline] = None, corporate_baseline: Optional[CorporateEnglishBaseline] = None) -> AnswerEntry:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             # Determine next seq number
@@ -279,14 +279,18 @@ class SessionManager:
 
             recorded_at = datetime.now(timezone.utc).isoformat()
             
-            loc_json = local_baseline.model_dump_json() if local_baseline else LocalLanguageBaseline(transcript=e4b_transcript, status="COMPILED").model_dump_json()
+            loc_obj = local_baseline or LocalLanguageBaseline(transcript=e4b_transcript, status="COMPILED")
+            corp_obj = corporate_baseline or CorporateEnglishBaseline(language_code="en-US", transcript=gemma12b_output, status="READY", editable=True)
+
+            loc_json = loc_obj.model_dump_json()
+            corp_json = corp_obj.model_dump_json()
 
             cursor.execute(
                 """
-                INSERT INTO answer_entries (thread_id, seq, e4b_transcript, gemma12b_output, local_language_json, recorded_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO answer_entries (thread_id, seq, e4b_transcript, gemma12b_output, local_language_json, corporate_english_json, recorded_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (thread_id, next_seq, e4b_transcript, gemma12b_output, loc_json, recorded_at)
+                (thread_id, next_seq, e4b_transcript, gemma12b_output, loc_json, corp_json, recorded_at)
             )
 
             # Audit log
@@ -306,7 +310,8 @@ class SessionManager:
                 seq=next_seq,
                 e4b_transcript=e4b_transcript,
                 gemma12b_output=gemma12b_output,
-                local_language_baseline=local_baseline or LocalLanguageBaseline(transcript=e4b_transcript, status="COMPILED"),
+                local_language_baseline=loc_obj,
+                corporate_english_baseline=corp_obj,
                 recorded_at=recorded_at
             )
 
