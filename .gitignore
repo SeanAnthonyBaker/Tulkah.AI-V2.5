@@ -1,0 +1,9 @@
+
+# Python Virtual Environments & Audio/DB Cache
+venv/
+*.db
+*.sqlite
+audio_outputs/
+__pycache__/
+*.pyc
+.env
