@@ -497,6 +497,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: Text(
             label,
             textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: isSelected ? Colors.white : const Color(0xFFE2E8F0),
               fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,

@@ -45,10 +45,10 @@ compute_choice = "float16" if device_choice == "cuda" else "int8"
 logger.info(f"Faster-Whisper selecting device: {device_choice} ({compute_choice})")
 
 try:
-    whisper_model = WhisperModel("small", device=device_choice, compute_type=compute_choice, download_root="/tmp/hf_cache")
+    whisper_model = WhisperModel("base", device=device_choice, compute_type=compute_choice, download_root="/tmp/hf_cache")
 except Exception as e:
     logger.warning(f"CUDA initialization fallback to CPU: {e}")
-    whisper_model = WhisperModel("small", device="cpu", compute_type="int8", download_root="/tmp/hf_cache")
+    whisper_model = WhisperModel("base", device="cpu", compute_type="int8", download_root="/tmp/hf_cache")
 
 logger.info(f"Faster-Whisper AI model ready on {device_choice}.")
 
@@ -206,7 +206,7 @@ async def transcribe_audio(file: UploadFile = File(...), language_code: str = Qu
             f.write(content)
 
         lang_arg = None if language_code == "auto" else language_code
-        segments, info = whisper_model.transcribe(temp_path, beam_size=5, language=lang_arg)
+        segments, info = whisper_model.transcribe(temp_path, beam_size=1, language=lang_arg)
         text = " ".join([segment.text for segment in segments]).strip()
 
         if not text:

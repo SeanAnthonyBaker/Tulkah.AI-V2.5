@@ -26,14 +26,17 @@ class Gemma12BService:
         if not raw:
             return ""
 
-        # 1. Quick Local Rule-Based Corporate English Translation Fallback
-        lower_raw = raw.lower()
-        german_indicators = ["wir", "gehen", "geht", "gut", "sehr", "nach", "arbeiten", "kann", "ich", "danke", "wie", "ist", "oder", "nicht", "und", "aber", "mit", "für"]
-        russian_indicators = ["мы", "работаем", "все", "хорошо", "процесс", "вопрос", "ответ", "как", "это"]
-        spanish_indicators = ["nosotros", "vamos", "trabajo", "bueno", "proceso", "para", "como", "esta"]
-        french_indicators = ["nous", "travail", "bon", "processus", "pour", "comme", "est"]
-
-        is_non_english = any(w in lower_raw.split() for w in german_indicators + russian_indicators + spanish_indicators + french_indicators)
+        # 1. High-Speed Sub-Second Multilingual Translation to English
+        english_translation = raw
+        try:
+            from deep_translator import GoogleTranslator
+            translated = GoogleTranslator(source='auto', target='en').translate(raw)
+            if translated and translated.strip():
+                english_translation = translated.strip()
+                logger.info(f"DeepTranslator Multilingual Translation: '{raw}' -> '{english_translation}'")
+                return english_translation
+        except Exception as e:
+            logger.warning(f"DeepTranslator fallback: {e}")
 
         # Try local Gemma 12B API first (timeout 3.0s)
         try:
