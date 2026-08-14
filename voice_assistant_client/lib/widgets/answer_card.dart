@@ -308,15 +308,18 @@ class AnswerCard extends ConsumerWidget {
                     children: [
                       const Icon(Icons.language, color: Colors.white, size: 14),
                       const SizedBox(width: 6),
-                      Text(
-                        answer.localLanguageBaseline != null
-                            ? "PRIMARY: LOCAL SPOKEN LANGUAGE BASELINE [${answer.localLanguageBaseline!.languageCode.toUpperCase()}]"
-                            : "PRIMARY: LOCAL SPOKEN LANGUAGE BASELINE",
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
+                      Flexible(
+                        child: Text(
+                          answer.localLanguageBaseline != null
+                              ? "PRIMARY: SPOKEN BASELINE [${answer.localLanguageBaseline!.languageCode.toUpperCase()}]"
+                              : "PRIMARY: SPOKEN BASELINE",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
