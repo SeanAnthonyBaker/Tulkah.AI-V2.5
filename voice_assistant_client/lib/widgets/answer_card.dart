@@ -274,72 +274,79 @@ class AnswerCard extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 14),
-          // Corporate English Baseline Badge
-          if (answer.corporateEnglishBaseline != null) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF4338CA), Color(0xFF312E81)],
-                ),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF818CF8)),
+
+          // 1. PROMINENT PRIMARY: Local Spoken Language Baseline
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
               ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.lock, color: Color(0xFFA5B4FC), size: 13),
-                  SizedBox(width: 6),
-                  Text(
-                    "CORPORATE ENGLISH BASELINE (READ-ONLY)",
-                    style: TextStyle(color: Color(0xFFE0E7FF), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF0284C7), width: 1.5),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black45,
+                  blurRadius: 6,
+                  offset: Offset(0, 2),
+                )
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
+                    ),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                ],
-              ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.language, color: Colors.white, size: 14),
+                      const SizedBox(width: 6),
+                      Text(
+                        answer.localLanguageBaseline != null
+                            ? "PRIMARY: LOCAL SPOKEN LANGUAGE BASELINE [${answer.localLanguageBaseline!.languageCode.toUpperCase()}]"
+                            : "PRIMARY: LOCAL SPOKEN LANGUAGE BASELINE",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  answer.localLanguageBaseline != null && answer.localLanguageBaseline!.transcript.isNotEmpty
+                      ? answer.localLanguageBaseline!.transcript
+                      : (answer.e4bTranscript.isNotEmpty ? answer.e4bTranscript : "No transcript recorded."),
+                  style: const TextStyle(
+                    color: Color(0xFFF8FAFC),
+                    fontSize: 16,
+                    height: 1.45,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              answer.corporateEnglishBaseline!.transcript,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                height: 1.45,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-          ] else ...[
-            const Text(
-              "Refined Output (Gemma 12B):",
-              style: TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              answer.gemma12bOutput.isNotEmpty
-                  ? answer.gemma12bOutput
-                  : "Processing refinement...",
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                height: 1.45,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-          const Divider(color: Color(0xFF1E293B)),
+          ),
+
+          const SizedBox(height: 14),
+          const Divider(color: Color(0xFF334155)),
           const SizedBox(height: 8),
 
-          // Local Language Baseline Indicator
+          // 2. SECONDARY SUBDUED: Corporate English Refinement (Gemma 12B)
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF0F172A),
+              color: const Color(0xFF090D16),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: const Color(0xFF1E293B)),
             ),
@@ -347,15 +354,13 @@ class AnswerCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  children: [
-                    const Icon(Icons.language, color: Color(0xFF38BDF8), size: 14),
-                    const SizedBox(width: 6),
+                  children: const [
+                    Icon(Icons.lock, color: Color(0xFF64748B), size: 13),
+                    SizedBox(width: 6),
                     Text(
-                      answer.localLanguageBaseline != null
-                          ? "LOCAL LANGUAGE BASELINE [${answer.localLanguageBaseline!.languageCode.toUpperCase()}]"
-                          : "LOCAL SPOKEN TRANSCRIPT",
-                      style: const TextStyle(
-                        color: Color(0xFF38BDF8),
+                      "SECONDARY: CORPORATE ENGLISH REFINEMENT (READ-ONLY)",
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.5,
@@ -363,16 +368,16 @@ class AnswerCard extends ConsumerWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Text(
-                  answer.localLanguageBaseline != null
-                      ? answer.localLanguageBaseline!.transcript
-                      : answer.e4bTranscript,
+                  answer.corporateEnglishBaseline != null && answer.corporateEnglishBaseline!.transcript.isNotEmpty
+                      ? answer.corporateEnglishBaseline!.transcript
+                      : (answer.gemma12bOutput.isNotEmpty ? answer.gemma12bOutput : "Awaiting English translation..."),
                   style: const TextStyle(
-                    color: Color(0xFFCBD5E1),
+                    color: Color(0xFF94A3B8),
                     fontSize: 13,
-                    fontStyle: FontStyle.italic,
-                    height: 1.35,
+                    height: 1.4,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
