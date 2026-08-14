@@ -11,12 +11,14 @@ final e4bServiceProvider = Provider<E4BClientService>((ref) => E4BClientService(
 class SessionState {
   final SessionModel? session;
   final String activeThreadId;
+  final String selectedLanguage;
   final bool isLoading;
   final String? errorMessage;
 
   SessionState({
     this.session,
-    this.activeThreadId = 'thr_105',
+    this.activeThreadId = 'thr_101',
+    this.selectedLanguage = 'auto',
     this.isLoading = false,
     this.errorMessage,
   });
@@ -24,12 +26,14 @@ class SessionState {
   SessionState copyWith({
     SessionModel? session,
     String? activeThreadId,
+    String? selectedLanguage,
     bool? isLoading,
     String? errorMessage,
   }) {
     return SessionState(
       session: session ?? this.session,
       activeThreadId: activeThreadId ?? this.activeThreadId,
+      selectedLanguage: selectedLanguage ?? this.selectedLanguage,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
     );
@@ -272,6 +276,10 @@ class SessionNotifier extends StateNotifier<SessionState> {
     }
   }
 
+  void setLanguage(String langCode) {
+    state = state.copyWith(selectedLanguage: langCode);
+  }
+
   void setActiveThread(String threadId) {
     state = state.copyWith(activeThreadId: threadId);
   }
@@ -442,7 +450,7 @@ class SessionNotifier extends StateNotifier<SessionState> {
       // 1. Transcribe actual spoken voice audio recorded on phone
       String rawTranscript;
       try {
-        rawTranscript = await _apiService.transcribeAudioFile(audioFilePath);
+        rawTranscript = await _apiService.transcribeAudioFile(audioFilePath, languageCode: state.selectedLanguage);
       } catch (_) {
         final e4bResult = await _e4bService.transcribeAudio(audioFilePath);
         rawTranscript = e4bResult.transcript;

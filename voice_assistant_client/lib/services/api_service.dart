@@ -77,9 +77,9 @@ class ApiService {
     }
   }
 
-  Future<String> transcribeAudioFile(String audioFilePath) async {
+  Future<String> transcribeAudioFile(String audioFilePath, {String languageCode = 'auto'}) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/v1/audio/transcribe');
+      final uri = Uri.parse('$baseUrl/api/v1/audio/transcribe?language_code=$languageCode');
       final request = http.MultipartRequest('POST', uri);
 
       if (kIsWeb || audioFilePath.startsWith('blob:') || audioFilePath.startsWith('http')) {

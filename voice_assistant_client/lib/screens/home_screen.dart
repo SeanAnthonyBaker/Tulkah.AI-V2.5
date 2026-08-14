@@ -6,6 +6,20 @@ import '../providers/playback_provider.dart';
 import '../widgets/answer_card.dart';
 import '../widgets/hold_to_record_button.dart';
 
+const Map<String, String> interviewLanguages = {
+  'auto': '🌐 Auto-Detect',
+  'ru': '🇷🇺 Russian (Русский)',
+  'en': '🇬🇧 English',
+  'es': '🇪🇸 Spanish (Español)',
+  'fr': '🇫🇷 French (Français)',
+  'de': '🇩🇪 German (Deutsch)',
+  'zh': '🇨🇳 Mandarin (中文)',
+  'ar': '🇸🇦 Arabic (العربية)',
+  'pt': '🇵🇹 Portuguese (Português)',
+  'hi': '🇮🇳 Hindi (हिन्दी)',
+  'sw': '🇰🇪 Swahili (Kiswahili)',
+};
+
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
@@ -102,6 +116,71 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ? "UPCOMING (#${activeThread.sortOrder + 1})"
                         : "UPCOMING (0)",
                     status: "upcoming",
+                  ),
+                ],
+              ),
+            ),
+
+            // 1.5 Interviewee Preferred Spoken Language Bar
+            Container(
+              color: const Color(0xFF1E293B),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.language, color: Color(0xFF38BDF8), size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        "INTERVIEWEE LANGUAGE",
+                        style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF38BDF8), width: 1.0),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: sessionState.selectedLanguage,
+                        dropdownColor: const Color(0xFF0F172A),
+                        icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF38BDF8)),
+                        isDense: true,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                        onChanged: (String? newLang) {
+                          if (newLang != null) {
+                            sessionNotifier.setLanguage(newLang);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text("🌐 Interviewee Preferred Language set to: ${interviewLanguages[newLang]}"),
+                                backgroundColor: const Color(0xFF0284C7),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                        items: interviewLanguages.entries.map((entry) {
+                          return DropdownMenuItem<String>(
+                            value: entry.key,
+                            child: Text(entry.value),
+                          );
+                        }).toList(),
+                      ),
+                    ),
                   ),
                 ],
               ),
