@@ -16,6 +16,185 @@ class Gemma12BService:
         self.endpoint = os.getenv("GEMMA12B_ENDPOINT", "")
         self.api_key = os.getenv("GEMMA12B_API_KEY", "")
 
+    def stream_ai_answer(self, question_text: str, sentence_count: int = 3, language_code: str = "en"):
+        """
+        Yields real-time streaming chunks of the generated AI answer using Gemini Flash SSE,
+        instructing the model to write sentence_count sentences focusing on Six Sigma improvement and incident evidencing.
+        """
+        import requests, json, time
+
+        system_role = (
+            f"You are an expert Finance Specialist working in the Systems Integration business. "
+            f"Answer the interview question clearly, professionally, and accurately in language ({language_code}). "
+            f"Focus heavily on where processes can get better, evidencing operational incidents using Six Sigma methodologies "
+            f"(such as DMAIC, DPMO defect metrics, 5 Whys, and root-cause analysis) and highlighting specific areas for improvement with concrete examples. "
+            f"Write EXTREMELY ACCURATE text consisting of EXACTLY {sentence_count} complete sentences."
+        )
+        prompt = f"{system_role}\n\nQuestion: {question_text}\nAnswer:"
+
+        gemini_api_key = os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_API_KEY", "")
+        if gemini_api_key:
+            try:
+                gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key={gemini_api_key}"
+                payload = {"contents": [{"parts": [{"text": prompt}]}]}
+                resp = requests.post(gemini_url, json=payload, stream=True, timeout=10.0)
+                if resp.status_code == 200:
+                    for line in resp.iter_lines():
+                        if line:
+                            decoded = line.decode('utf-8')
+                            if decoded.startswith("data: "):
+                                json_str = decoded[6:]
+                                try:
+                                    data = json.loads(json_str)
+                                    candidates = data.get("candidates", [])
+                                    if candidates:
+                                        parts = candidates[0].get("content", {}).get("parts", [])
+                                        if parts:
+                                            chunk = parts[0].get("text", "")
+                                            if chunk:
+                                                yield chunk
+                                except Exception:
+                                    pass
+                    return
+            except Exception as e:
+                logger.warning(f"Gemini streaming exception: {e}")
+
+        # Fallback offline generator: stream text in word chunks
+        base_answer = self.generate_ai_answer(question_text, language_code)
+        base_sentences = [s.strip() for s in base_answer.split('.') if s.strip()]
+        
+        extra_sentences = [
+            "Through Six Sigma DMAIC analysis of Accounts Payable workflows, we identified a 14% DPMO defect rate caused by manual ERP 3-way matching exceptions.",
+            "By implementing automated reconciliation controls and root-cause incident tracking, we eliminated payment delay incidents and improved touchless processing to 96%.",
+            "Root-cause Fishbone analysis revealed vendor master duplication as a major operational bottleneck, which we resolved by enforcing strict SLA governance.",
+            "Continuous Kaizen process reviews and real-time ERP throughput monitoring reduced invoice processing cycle lead time by 35%.",
+            "Key performance metrics are benchmarked against Six Sigma quality thresholds to ensure seamless financial data governance across all integrated systems."
+        ]
+        
+        sentences = list(base_sentences)
+        idx = 0
+        while len(sentences) < sentence_count:
+            sentences.append(extra_sentences[idx % len(extra_sentences)])
+            idx += 1
+        sentences = sentences[:sentence_count]
+        final_answer = ". ".join(sentences) + "."
+
+        words = final_answer.split(" ")
+        for i in range(0, len(words), 3):
+            chunk = " ".join(words[i:i+3]) + " "
+            yield chunk
+            time.sleep(0.06)
+
+    def generate_ai_answer(self, question_text: str, language_code: str = "en") -> str:
+        """
+        Generates an expert answer assuming the persona of a Finance Specialist
+        in the Systems Integration business in the requested language using Gemini Flash or local LLM.
+        """
+        import requests, json
+        system_role = (
+            "You are an expert Finance Specialist working in the Systems Integration business. "
+            f"Answer the interview question clearly, professionally, and accurately in language ({language_code}). "
+            "Focus heavily on where processes can get better, evidencing operational incidents using Six Sigma methodologies "
+            "(such as DMAIC, DPMO defect metrics, 5 Whys, and root-cause analysis) and highlighting specific areas for improvement with concrete examples. "
+            "Keep the answer concise and direct."
+        )
+        prompt = f"{system_role}\n\nQuestion: {question_text}\nAnswer:"
+
+        # 1. Try Gemini Flash API if GEMINI_API_KEY environment variable is present
+        gemini_api_key = os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_API_KEY", "")
+        if gemini_api_key:
+            try:
+                gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_api_key}"
+                payload = {
+                    "contents": [{"parts": [{"text": prompt}]}]
+                }
+                resp = requests.post(gemini_url, json=payload, timeout=8.0)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts:
+                            text = parts[0].get("text", "").strip()
+                            if text:
+                                logger.info(f"Gemini Flash AI Answer: '{text[:60]}...'")
+                                return text
+            except Exception as e:
+                logger.warning(f"Gemini Flash API generate_ai_answer exception: {e}")
+
+        # 2. Try Local LLM Endpoint if available
+        try:
+            resp = requests.post(
+                "http://localhost:8000/api/query",
+                json={"prompt": prompt},
+                timeout=3.0
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                answer = data.get("response", "").strip()
+                if answer:
+                    logger.info(f"Local LLM AI Answer: {answer}")
+                    return answer
+        except Exception as e:
+            logger.warning(f"Local LLM generate_ai_answer fallback: {e}")
+
+        # 3. High-quality Finance Specialist response fallback
+        q_lower = question_text.lower()
+        if "bottleneck" in q_lower or "accounts payable" in q_lower or "value-stream" in q_lower:
+            return "We utilize value-stream mapping and real-time ERP throughput monitoring to target Accounts Payable latency. By establishing key SLA benchmarks and automated reconciliation rules, we reduced invoice processing lead time by 35%. Continuous Kaizen reviews ensure our systems integration interfaces remain optimized."
+        elif "metric" in q_lower or "kpi" in q_lower or "technique" in q_lower:
+            return "Key performance metrics include first-pass yield rate, cost per invoice processed, and cycle time from receipt to posting. In systems integration projects, aligning these KPIs with automated 3-way matching across ERP modules provides transparent financial governance."
+        return "In systems integration financial management, we align core operating metrics with automated ERP workflows. By enforcing strict SLA targets and continuous process monitoring, we ensure seamless data reconciliation and optimal capital efficiency."
+
+    def apply_edit_command(self, current_text: str, instruction: str) -> str:
+        """
+        Executes a natural language editing command against the current answer text.
+        Does NOT append the instruction, but transforms the text according to the command.
+        """
+        if not current_text or not current_text.strip():
+            return ""
+        if not instruction or not instruction.strip():
+            return current_text
+
+        text = current_text.strip()
+        cmd = instruction.strip().lower()
+
+        # 1. Delete / Undo last sentence or segment
+        if any(kw in cmd for kw in ["delete last", "remove last", "undo", "trim last", "delete sentence", "remove sentence", "delete segment"]):
+            import re
+            parts = [p.strip() for p in re.split(r'(?<=[.!?])\s+', text) if p.strip()]
+            if len(parts) > 1:
+                return " ".join(parts[:-1])
+            return ""
+
+        # 2. Clear all
+        if any(kw in cmd for kw in ["clear all", "clear answer", "delete all", "reset answer", "clear"]):
+            return ""
+
+        # 3. Replace "X" with "Y" / Change "X" to "Y"
+        import re
+        replace_match = re.search(r'(?:change|replace|substitute)\s+["\']?([^"\']+?)["\']?\s+(?:with|to)\s+["\']?([^"\']+?)["\']?$', cmd, re.IGNORECASE)
+        if replace_match:
+            old_word = replace_match.group(1).strip()
+            new_word = replace_match.group(2).strip()
+            pattern = re.compile(re.escape(old_word), re.IGNORECASE)
+            return pattern.sub(new_word, text)
+
+        # 4. Remove / Delete specific word or phrase
+        remove_match = re.search(r'(?:remove|delete|drop|strip)\s+["\']?([^"\']+?)["\']?$', cmd, re.IGNORECASE)
+        if remove_match:
+            target = remove_match.group(1).strip()
+            if target and target not in ["last segment", "last sentence", "answer", "all", "segment", "part"]:
+                pattern = re.compile(re.escape(target), re.IGNORECASE)
+                cleaned = pattern.sub("", text)
+                return re.sub(r'\s+', ' ', cleaned).strip()
+
+        # 5. Generic edit instruction: remove filler words & re-capitalize
+        cleaned = text
+        for filler in [" uh ", " um ", " Uh ", " Um "]:
+            cleaned = cleaned.replace(filler, " ")
+        return cleaned.strip()
+
     def _translate_to_corporate_english(self, text: str, question_text: str = "") -> str:
         """
         Translates non-English spoken responses (German, Russian, Spanish, French, etc.)
@@ -53,7 +232,7 @@ class Gemma12BService:
                     "think": False,
                     "language": "en"
                 },
-                timeout=3.0,
+                timeout=0.1,
                 stream=True
             )
             tokens = []
@@ -139,15 +318,7 @@ class Gemma12BService:
         if cleaned and not cleaned.endswith(('.', '?', '!')):
             cleaned += '.'
 
-        if prior_context:
-            latest_prior = prior_context[-1]
-            if cleaned.lower() in latest_prior.lower():
-                refined_result = latest_prior
-            else:
-                refined_result = f"{latest_prior} {cleaned}"
-        else:
-            refined_result = cleaned
-
+        refined_result = cleaned
         logger.info(f"Gemma 12B Refined Output (Corporate English): '{raw_text}' -> '{refined_result}'")
         return refined_result
 

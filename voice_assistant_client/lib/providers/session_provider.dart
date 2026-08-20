@@ -284,6 +284,101 @@ class SessionNotifier extends StateNotifier<SessionState> {
     state = state.copyWith(activeThreadId: threadId);
   }
 
+  Future<void> deleteLastSegment() async {
+    final currentThreadId = state.activeThreadId;
+    final currentSession = state.session;
+    if (currentSession == null) return;
+
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final updatedSession = await _apiService.deleteLastSegment(currentSession.sessionId, currentThreadId);
+      state = state.copyWith(session: updatedSession, isLoading: false);
+    } catch (e) {
+      // Local fallback trim
+      final activeT = state.activeThread;
+      if (activeT != null && activeT.answers.isNotEmpty) {
+        final currentAns = activeT.answers.last;
+        final rawText = currentAns.e4bTranscript.trim();
+        final parts = rawText.split(RegExp(r'(?<=[.!?])\s+'));
+        final trimmedText = parts.length > 1 ? parts.sublist(0, parts.length - 1).join(' ') : '';
+
+        final newAns = AnswerEntryModel(
+          seq: 1,
+          e4bTranscript: trimmedText,
+          gemma12bOutput: trimmedText,
+          localLanguageBaseline: LocalLanguageBaselineModel(languageCode: state.selectedLanguage, transcript: trimmedText, status: 'COMPILED'),
+          corporateEnglishBaseline: CorporateEnglishBaselineModel(languageCode: 'en-US', transcript: trimmedText, status: 'READY', editable: true),
+          recordedAt: DateTime.now().toIso8601String(),
+        );
+
+        final updatedThreads = currentSession.questionThreads.map((t) {
+          if (t.threadId == currentThreadId) {
+            return t.copyWith(answers: trimmedText.isEmpty ? [] : [newAns]);
+          }
+          return t;
+        }).toList();
+
+        state = state.copyWith(
+          session: SessionModel(sessionId: currentSession.sessionId, questionThreads: updatedThreads),
+          isLoading: false,
+        );
+      } else {
+        state = state.copyWith(isLoading: false);
+      }
+    }
+  }
+
+  Future<void> adjustAnswer(String instruction) async {
+    final currentThreadId = state.activeThreadId;
+    final currentSession = state.session;
+    if (currentSession == null || instruction.trim().isEmpty) return;
+
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final updatedSession = await _apiService.adjustAnswer(currentSession.sessionId, currentThreadId, instruction);
+      state = state.copyWith(session: updatedSession, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: 'Error adjusting answer: $e');
+    }
+  }
+
+  Future<void> generateAIAnswer({int sentenceCount = 3}) async {
+    final currentThreadId = state.activeThreadId;
+    final currentSession = state.session;
+    if (currentSession == null) return;
+
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final updatedSession = await _apiService.streamAIAnswer(
+        currentSession.sessionId,
+        currentThreadId,
+        sentenceCount,
+        (accumulatedText) {
+          final updatedThreads = currentSession.questionThreads.map((t) {
+            if (t.threadId == currentThreadId) {
+              final newAnswer = AnswerEntryModel(
+                seq: 1,
+                e4bTranscript: accumulatedText,
+                gemma12bOutput: accumulatedText,
+                recordedAt: DateTime.now().toIso8601String(),
+              );
+              return t.copyWith(answers: [newAnswer]);
+            }
+            return t;
+          }).toList();
+
+          state = state.copyWith(
+            session: SessionModel(sessionId: currentSession.sessionId, questionThreads: updatedThreads),
+            isLoading: false,
+          );
+        },
+      );
+      state = state.copyWith(session: updatedSession, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: 'Error generating AI answer: $e');
+    }
+  }
+
   Future<void> clearCurrentAnswer() async {
     final currentThreadId = state.activeThreadId;
     final currentSession = state.session;

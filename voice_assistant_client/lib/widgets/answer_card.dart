@@ -172,278 +172,66 @@ class AnswerCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playbackState = ref.watch(playbackProvider);
-    final isCurrentlyPlaying = playbackState.currentPlayingSeq == answer.seq &&
-        (playbackState.status == PlaybackStatus.playingSingle ||
-            playbackState.status == PlaybackStatus.playingAll);
+    final textContent = answer.e4bTranscript.isNotEmpty
+        ? answer.e4bTranscript
+        : (answer.localLanguageBaseline != null && answer.localLanguageBaseline!.transcript.isNotEmpty
+            ? answer.localLanguageBaseline!.transcript
+            : "Hold the speak button below to start answering...");
 
     return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 180, maxHeight: 380),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isCurrentlyPlaying
-              ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-              : [const Color(0xFF0F172A), const Color(0xFF020617)],
-        ),
+        color: const Color(0xFF0B132B),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isCurrentlyPlaying ? const Color(0xFF6366F1) : const Color(0xFF1E293B),
-          width: isCurrentlyPlaying ? 2 : 1.2,
-        ),
-        boxShadow: [
-          if (isCurrentlyPlaying)
-            BoxShadow(
-              color: const Color(0xFF6366F1).withOpacity(0.35),
-              blurRadius: 14,
-              spreadRadius: 2,
-            )
-          else
-            const BoxShadow(
-              color: Colors.black38,
-              blurRadius: 6,
-              offset: Offset(0, 3),
-            )
+        border: Border.all(color: const Color(0xFF0284C7), width: 1.5),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black45,
+            blurRadius: 8,
+            offset: Offset(0, 3),
+          )
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: isCurrentlyPlaying
-                            ? [const Color(0xFF6366F1), const Color(0xFF4F46E5)]
-                            : [const Color(0xFF312E81), const Color(0xFF1E1B4B)],
-                      ),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isCurrentlyPlaying ? const Color(0xFF818CF8) : const Color(0xFF4338CA),
-                      ),
-                    ),
-                    child: Text(
-                      "Iteration #${answer.seq}",
-                      style: const TextStyle(
-                        color: Color(0xFFE0E7FF),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.auto_awesome, color: Color(0xFF34D399), size: 12),
-                        SizedBox(width: 4),
-                        Text(
-                          "Gemma 12B",
-                          style: TextStyle(color: Color(0xFF34D399), fontSize: 10, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  if (isCurrentlyPlaying)
-                    const Padding(
-                      padding: EdgeInsets.only(right: 6),
-                      child: Icon(Icons.volume_up, color: Color(0xFF38BDF8), size: 16),
-                    ),
-                  Text(
-                    _formatTime(answer.recordedAt),
-                    style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // 1. PROMINENT PRIMARY: Local Spoken Language Baseline
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-              ),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF0284C7), width: 1.5),
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black45,
-                  blurRadius: 6,
-                  offset: Offset(0, 2),
-                )
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.language, color: Colors.white, size: 14),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                answer.localLanguageBaseline != null
-                                    ? "PRIMARY: SPOKEN BASELINE [${answer.localLanguageBaseline!.languageCode.toUpperCase()}]"
-                                    : "PRIMARY: SPOKEN BASELINE",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.5,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.copy, color: Colors.white, size: 14),
-                        constraints: const BoxConstraints(),
-                        padding: EdgeInsets.zero,
-                        tooltip: "Copy Spoken Baseline to Clipboard for MS Teams",
-                        onPressed: () {
-                          final textToCopy = answer.localLanguageBaseline != null && answer.localLanguageBaseline!.transcript.isNotEmpty
-                              ? answer.localLanguageBaseline!.transcript
-                              : answer.e4bTranscript;
-                          if (textToCopy.isNotEmpty) {
-                            Clipboard.setData(ClipboardData(text: textToCopy));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text("📋 Spoken Baseline copied to clipboard! Ready to paste into MS Teams."),
-                                backgroundColor: Color(0xFF0284C7),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                    ],
-                  ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4, right: 30, left: 4, bottom: 4),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: SelectableText(
+                textContent,
+                style: const TextStyle(
+                  color: Color(0xFFF8FAFC),
+                  fontSize: 16,
+                  height: 1.5,
+                  fontWeight: FontWeight.w600,
                 ),
-                const SizedBox(height: 10),
-                SelectableText(
-                  answer.localLanguageBaseline != null && answer.localLanguageBaseline!.transcript.isNotEmpty
-                      ? answer.localLanguageBaseline!.transcript
-                      : (answer.e4bTranscript.isNotEmpty ? answer.e4bTranscript : "No transcript recorded."),
-                  style: const TextStyle(
-                    color: Color(0xFFF8FAFC),
-                    fontSize: 16,
-                    height: 1.45,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-
-          const SizedBox(height: 14),
-          const Divider(color: Color(0xFF334155)),
-          const SizedBox(height: 8),
-
-          // 2. SECONDARY SUBDUED: Corporate English Refinement (Gemma 12B)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF090D16),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFF1E293B)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: const [
-                          Icon(Icons.lock, color: Color(0xFF64748B), size: 13),
-                          SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              "SECONDARY: CORPORATE ENGLISH REFINEMENT",
-                              style: TextStyle(
-                                color: Color(0xFF64748B),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
+          Positioned(
+            top: 0,
+            right: 0,
+            child: IconButton(
+              icon: const Icon(Icons.copy, color: Color(0xFF38BDF8), size: 16),
+              constraints: const BoxConstraints(),
+              padding: EdgeInsets.zero,
+              tooltip: "Copy text to Clipboard for MS Teams",
+              onPressed: () {
+                if (textContent.isNotEmpty) {
+                  Clipboard.setData(ClipboardData(text: textContent));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("📋 Spoken answer copied to clipboard!"),
+                      backgroundColor: Color(0xFF0284C7),
+                      duration: Duration(seconds: 2),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.copy, color: Color(0xFF38BDF8), size: 14),
-                      constraints: const BoxConstraints(),
-                      padding: EdgeInsets.zero,
-                      tooltip: "Copy Corporate English to Clipboard for MS Teams",
-                      onPressed: () {
-                        final textToCopy = answer.corporateEnglishBaseline != null && answer.corporateEnglishBaseline!.transcript.isNotEmpty
-                            ? answer.corporateEnglishBaseline!.transcript
-                            : answer.gemma12bOutput;
-                        if (textToCopy.isNotEmpty) {
-                          Clipboard.setData(ClipboardData(text: textToCopy));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("📋 Corporate English copied to clipboard! Ready to paste into MS Teams."),
-                              backgroundColor: Color(0xFF0284C7),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        }
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                SelectableText(
-                  answer.corporateEnglishBaseline != null && answer.corporateEnglishBaseline!.transcript.isNotEmpty
-                      ? answer.corporateEnglishBaseline!.transcript
-                      : (answer.gemma12bOutput.isNotEmpty ? answer.gemma12bOutput : "Awaiting English translation..."),
-                  style: const TextStyle(
-                    color: Color(0xFF94A3B8),
-                    fontSize: 13,
-                    height: 1.4,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+                  );
+                }
+              },
             ),
           ),
         ],

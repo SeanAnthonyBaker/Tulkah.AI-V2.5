@@ -42,10 +42,13 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   }
 
   void _initTts() async {
-    await _flutterTts.setLanguage("en-GB");
-    await _flutterTts.setSpeechRate(0.48);
-    await _flutterTts.setPitch(1.0);
-    await _flutterTts.setVolume(1.0);
+    try {
+      await _flutterTts.awaitSpeakCompletion(true);
+      await _flutterTts.setLanguage("en-US");
+      await _flutterTts.setSpeechRate(0.5);
+      await _flutterTts.setPitch(1.0);
+      await _flutterTts.setVolume(1.0);
+    } catch (_) {}
 
     // Try setting a preferred UK voice if available on Android
     try {
@@ -130,7 +133,17 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
       currentPlayingSeq: latestAnswer.seq,
     );
 
-    await _flutterTts.speak(textToSpeak);
+    try {
+      await _flutterTts.setEngine("com.google.android.tts");
+      await _flutterTts.setLanguage("en-US");
+      await _flutterTts.setVolume(1.0);
+      await _flutterTts.setSpeechRate(0.5);
+      await _flutterTts.setPitch(1.0);
+      await _flutterTts.speak(textToSpeak);
+    } catch (e) {
+      await _flutterTts.setLanguage("en-US");
+      await _flutterTts.speak(textToSpeak);
+    }
   }
 
   Future<void> playSingleAnswer(String threadId, AnswerEntryModel answer) async {
@@ -151,7 +164,11 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   Future<void> _speakEntry(AnswerEntryModel answer) async {
     state = state.copyWith(currentPlayingSeq: answer.seq);
     String textToSpeak = answer.localLanguageBaseline?.transcript ?? answer.e4bTranscript;
-    await _flutterTts.speak(textToSpeak);
+    try {
+      await _flutterTts.setLanguage("en-US");
+      await _flutterTts.setVolume(1.0);
+      await _flutterTts.speak(textToSpeak);
+    } catch (_) {}
   }
 
   Future<void> _playNextInPlaylist() async {

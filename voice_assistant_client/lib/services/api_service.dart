@@ -6,7 +6,7 @@ import '../models/session_models.dart';
 class ApiService {
   String baseUrl;
 
-  ApiService({this.baseUrl = 'http://localhost:8080'});
+  ApiService({this.baseUrl = 'http://127.0.0.1:8080'});
 
   void updateBaseUrl(String newUrl) {
     if (!newUrl.startsWith('http://') && !newUrl.startsWith('https://')) {
@@ -74,6 +74,84 @@ class ApiService {
       return SessionModel.fromJson(jsonBody);
     } else {
       throw Exception('Failed to clear thread: ${response.statusCode}');
+    }
+  }
+
+  Future<SessionModel> deleteLastSegment(String sessionId, String threadId) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/api/v1/session/$sessionId/thread/$threadId/delete-last-segment'),
+          headers: {'Content-Type': 'application/json'},
+        )
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      final jsonBody = json.decode(response.body);
+      return SessionModel.fromJson(jsonBody);
+    } else {
+      throw Exception('Failed to delete last segment: ${response.statusCode}');
+    }
+  }
+
+  Future<SessionModel> adjustAnswer(String sessionId, String threadId, String instruction) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/api/v1/session/$sessionId/thread/$threadId/adjust?instruction=${Uri.encodeComponent(instruction)}'),
+          headers: {'Content-Type': 'application/json'},
+        )
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      final jsonBody = json.decode(response.body);
+      return SessionModel.fromJson(jsonBody);
+    } else {
+      throw Exception('Failed to adjust answer: ${response.statusCode}');
+    }
+  }
+
+  Future<SessionModel> generateAIAnswer(String sessionId, String threadId) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/api/v1/session/$sessionId/thread/$threadId/ai-answer'),
+          headers: {'Content-Type': 'application/json'},
+        )
+        .timeout(const Duration(seconds: 45));
+
+    if (response.statusCode == 200) {
+      final jsonBody = json.decode(response.body);
+      return SessionModel.fromJson(jsonBody);
+    } else {
+      throw Exception('Failed to generate AI answer: ${response.statusCode}');
+    }
+  }
+
+  Future<SessionModel> streamAIAnswer(
+    String sessionId,
+    String threadId,
+    int sentenceCount,
+    Function(String accumulatedText) onChunk,
+  ) async {
+    final client = http.Client();
+    try {
+      final request = http.Request(
+        'POST',
+        Uri.parse('$baseUrl/api/v1/session/$sessionId/thread/$threadId/ai-answer/stream?sentence_count=$sentenceCount'),
+      );
+      request.headers['Content-Type'] = 'application/json';
+
+      final response = await client.send(request);
+      if (response.statusCode == 200) {
+        String accumulated = "";
+        await response.stream.transform(utf8.decoder).forEach((chunk) {
+          accumulated += chunk;
+          onChunk(accumulated);
+        });
+        return await getSession(sessionId);
+      } else {
+        throw Exception('Stream failed with status: ${response.statusCode}');
+      }
+    } finally {
+      client.close();
     }
   }
 

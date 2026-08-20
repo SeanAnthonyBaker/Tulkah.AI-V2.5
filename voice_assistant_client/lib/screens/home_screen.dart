@@ -28,6 +28,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _selectedTabStatus = "current";
+  int _selectedSentenceLength = 3;
 
   @override
   Widget build(BuildContext context) {
@@ -99,21 +100,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: Row(
                 children: [
                   _buildTabHeaderButton(
-                    label: "ANSWERED (${allThreads.where((t) => t.status == 'previous').length})",
+                    label: "Answered (${allThreads.where((t) => t.status == 'previous').length})",
                     status: "previous",
                   ),
                   const SizedBox(width: 8),
                   _buildTabHeaderButton(
-                    label: activeThread != null
-                        ? "✅ QUESTION #${activeThread.sortOrder}"
-                        : "✅ NEXT QUESTION",
+                    label: "Current",
                     status: "current",
                   ),
                   const SizedBox(width: 8),
                   _buildTabHeaderButton(
-                    label: activeThread != null && allThreads.any((t) => t.status == 'upcoming')
-                        ? "UPCOMING (#${activeThread.sortOrder + 1})"
-                        : "UPCOMING (0)",
+                    label: "Remaining (${allThreads.where((t) => t.status == 'upcoming').length})",
                     status: "upcoming",
                   ),
                 ],
@@ -142,8 +139,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ],
                   ),
+                  // Language dropdown
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: const Color(0xFF0F172A),
                       borderRadius: BorderRadius.circular(8),
@@ -214,12 +212,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  "ACTIVE PROCESS QUESTION #${activeThread?.sortOrder ?? 1} OF ${allThreads.isNotEmpty ? allThreads.length : 15}",
+                                  "Question #${activeThread?.sortOrder ?? 1}",
                                   style: const TextStyle(
                                     color: Color(0xFF10B981),
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 11,
-                                    letterSpacing: 1.1,
+                                    fontSize: 13,
+                                    letterSpacing: 0.8,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -274,18 +272,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
 
-            // 3. EXECUTIVE ACTION TOOLBAR (Horizontal Scrollable Pill Bar - Zero Overflow)
+            // 3. Action Toolbar (Read, Adjust Answer, Clear)
             if (_selectedTabStatus == "current")
               Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-                  ),
-                  border: Border.symmetric(
-                    horizontal: BorderSide(color: Color(0xFF334155), width: 1.0),
-                  ),
-                ),
                 padding: const EdgeInsets.symmetric(vertical: 8),
+                color: const Color(0xFF0F172A),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),
@@ -327,9 +318,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           elevation: 3,
                         ),
                       ),
-                      const SizedBox(width: 8),
-
-
+                      const SizedBox(width: 10),
+                      // Button 2.5: Adjust Answer Button
+                      ElevatedButton.icon(
+                        onPressed: answers.isNotEmpty
+                            ? () {
+                                playbackNotifier.stopPlayback();
+                                _showAdjustAnswerDialog(context, sessionNotifier);
+                              }
+                            : null,
+                        icon: const Icon(Icons.edit_note, color: Colors.white, size: 16),
+                        label: const Text(
+                          "Adjust Answer",
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Colors.white, letterSpacing: 0.3),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD97706),
+                          disabledBackgroundColor: const Color(0xFF1E293B),
+                          disabledForegroundColor: const Color(0xFF64748B),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            side: const BorderSide(color: Color(0xFFFBBF24), width: 1.2),
+                          ),
+                          elevation: 3,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
 
                       // Button 3: Clear Button
                       ElevatedButton.icon(
@@ -390,17 +405,72 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ? Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
-                                children: const [
-                                  Icon(Icons.analytics_outlined, size: 48, color: Color(0xFF334155)),
-                                  SizedBox(height: 12),
-                                  Text(
-                                    "No process assessment entries recorded yet.",
-                                    style: TextStyle(color: Color(0xFF64748B)),
+                                children: [
+                                  const Icon(Icons.record_voice_over, size: 48, color: Color(0xFF334155)),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    "No answer recorded yet.",
+                                    style: TextStyle(color: Color(0xFF64748B), fontSize: 14, fontWeight: FontWeight.w500),
                                   ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    "Hold the speak button below or type to answer.",
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    "Hold to speak below or tap AI Answer to generate.",
                                     style: TextStyle(color: Color(0xFF475569), fontSize: 12),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      // Sentence count selector dropdown
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF0F172A),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: const Color(0xFF6366F1), width: 1.2),
+                                        ),
+                                        child: DropdownButtonHideUnderline(
+                                          child: DropdownButton<int>(
+                                            value: _selectedSentenceLength,
+                                            dropdownColor: const Color(0xFF0F172A),
+                                            icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF818CF8)),
+                                            isDense: true,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                            ),
+                                            onChanged: (int? newLen) {
+                                              if (newLen != null) {
+                                                setState(() {
+                                                  _selectedSentenceLength = newLen;
+                                                });
+                                              }
+                                            },
+                                            items: const [
+                                              DropdownMenuItem(value: 3, child: Text("3 Sentences")),
+                                              DropdownMenuItem(value: 5, child: Text("5 Sentences")),
+                                              DropdownMenuItem(value: 10, child: Text("10 Sentences")),
+                                              DropdownMenuItem(value: 20, child: Text("20 Sentences")),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      ElevatedButton.icon(
+                                        icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 16),
+                                        label: const Text("Generate AI Answer", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF6366F1),
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                          elevation: 4,
+                                        ),
+                                        onPressed: () {
+                                          sessionNotifier.generateAIAnswer(sentenceCount: _selectedSentenceLength);
+                                        },
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -409,7 +479,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       : _buildThreadsTabList(currentTabThreads, sessionNotifier, ref),
             ),
 
-            // 5. Bottom Hold-to-Record Button (Shown in 'current' tab)
+            // 5. Bottom Bar (Hold-to-Record Button)
             if (_selectedTabStatus == "current")
               Container(
                 padding: const EdgeInsets.all(12),
@@ -645,6 +715,132 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
 
+
+  void _showAdjustAnswerDialog(BuildContext context, SessionNotifier sessionNotifier) {
+    final controller = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+            top: 20,
+            left: 20,
+            right: 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.edit_note, color: Color(0xFFFBBF24), size: 22),
+                      SizedBox(width: 8),
+                      Text(
+                        "Adjust Answer (Command Mode)",
+                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white60, size: 20),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                "Enter an edit command or voice instruction to action against the current answer:",
+                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+
+              // Quick Preset Command Chips
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ActionChip(
+                    avatar: const Icon(Icons.undo, size: 14, color: Colors.white),
+                    label: const Text("Delete last sentence", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                    backgroundColor: const Color(0xFFD97706),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      sessionNotifier.adjustAnswer("delete last sentence");
+                    },
+                  ),
+                  ActionChip(
+                    avatar: const Icon(Icons.cleaning_services, size: 14, color: Colors.white),
+                    label: const Text("Clear all answer", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                    backgroundColor: const Color(0xFFB91C1C),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      sessionNotifier.clearCurrentAnswer();
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Text Field for Custom Command Instruction
+              TextField(
+                controller: controller,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: "e.g. Change 'SLA' to 'KPI', or Remove 'SAP'",
+                  hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
+                  filled: true,
+                  fillColor: const Color(0xFF1E293B),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFF334155)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Action Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.flash_on, size: 16, color: Colors.white),
+                    label: const Text("Execute Action", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD97706),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () {
+                      final text = controller.text.trim();
+                      if (text.isNotEmpty) {
+                        Navigator.pop(context);
+                        sessionNotifier.adjustAnswer(text);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   void _showServerSettingsDialog(BuildContext context, WidgetRef ref) {
     final currentUrl = ref.read(apiServiceProvider).baseUrl;

@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, status, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from faster_whisper import WhisperModel
-from models import Session, ChatContinueRequest, ChatContinueResponse, AudioChunkResponse, LocalLanguageBaseline
+from models import Session, ChatContinueRequest, ChatContinueResponse, AudioChunkResponse, LocalLanguageBaseline, CorporateEnglishBaseline
 from session_manager import SessionManager
 from services.gemma12b_service import Gemma12BService
 from services.tts_service import TTSService
@@ -102,6 +102,58 @@ def clear_thread(session_id: str, thread_id: str):
     except Exception as e:
         logger.error(f"Error clearing thread {thread_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/session/{session_id}/thread/{thread_id}/delete-last-segment", response_model=Session)
+def delete_last_segment(session_id: str, thread_id: str):
+    try:
+        return session_manager.delete_last_segment(session_id, thread_id)
+    except Exception as e:
+        logger.error(f"Error deleting last segment in thread {thread_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/session/{session_id}/thread/{thread_id}/adjust", response_model=Session)
+def adjust_answer(session_id: str, thread_id: str, instruction: str = Query("")):
+    """
+    Executes a voice or text command instruction against the existing answer baseline.
+    Does NOT append instruction text to the answer.
+    """
+    try:
+        return session_manager.adjust_answer(session_id, thread_id, instruction, gemma12b_service)
+    except Exception as e:
+        logger.error(f"Error adjusting answer in thread {thread_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/session/{session_id}/thread/{thread_id}/ai-answer", response_model=Session)
+def generate_ai_answer(session_id: str, thread_id: str):
+    """
+    Generates an expert answer to the question using Gemini / Gemma 12B assuming the persona of a
+    Finance Specialist in the Systems Integration business in the interview language.
+    """
+    try:
+        return session_manager.generate_ai_answer(session_id, thread_id, gemma12b_service)
+    except Exception as e:
+        logger.error(f"Error generating AI answer in thread {thread_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/session/{session_id}/thread/{thread_id}/ai-answer/stream")
+def stream_ai_answer(session_id: str, thread_id: str, sentence_count: int = Query(3)):
+    """
+    Streams the generated AI answer chunk by chunk via SSE and saves the completed text to the session database.
+    """
+    from fastapi.responses import StreamingResponse
+    session = session_manager.get_session(session_id)
+    target_thread = next((t for t in session.question_threads if t.thread_id == thread_id), None)
+    question_text = target_thread.question_text if target_thread else ""
+
+    def event_generator():
+        accumulated = ""
+        for chunk in gemma12b_service.stream_ai_answer(question_text, sentence_count=sentence_count):
+            accumulated += chunk
+            yield chunk
+        if accumulated.strip():
+            session_manager.add_ai_answer_direct(session_id, thread_id, accumulated.strip())
+
+    return StreamingResponse(event_generator(), media_type="text/plain")
 
 @app.post("/api/v1/session/{session_id}/thread/{thread_id}/accept", response_model=Session)
 def accept_thread(session_id: str, thread_id: str):

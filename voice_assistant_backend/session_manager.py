@@ -270,50 +270,262 @@ class SessionManager:
 
             return Session(session_id=session_id, question_threads=threads)
 
-    def add_answer(self, session_id: str, thread_id: str, e4b_transcript: str, gemma12b_output: str, local_baseline: Optional[LocalLanguageBaseline] = None, corporate_baseline: Optional[CorporateEnglishBaseline] = None) -> AnswerEntry:
+    def add_ai_answer_direct(self, session_id: str, thread_id: str, full_text: str) -> Session:
+        """
+        Saves a direct AI generated answer text into the answer_entries database for thread_id.
+        """
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            # Determine next seq number
-            cursor.execute("SELECT COALESCE(MAX(seq), 0) + 1 AS next_seq FROM answer_entries WHERE thread_id = ?", (thread_id,))
-            next_seq = cursor.fetchone()["next_seq"]
-
+            cursor.execute(
+                "SELECT id FROM answer_entries WHERE thread_id = ? ORDER BY seq ASC LIMIT 1",
+                (thread_id,)
+            )
+            row = cursor.fetchone()
             recorded_at = datetime.now(timezone.utc).isoformat()
-            
-            loc_obj = local_baseline or LocalLanguageBaseline(transcript=e4b_transcript, status="COMPILED")
-            corp_obj = corporate_baseline or CorporateEnglishBaseline(language_code="en-US", transcript=gemma12b_output, status="READY", editable=True)
+            loc_obj = LocalLanguageBaseline(transcript=full_text, status="COMPILED")
+            corp_obj = CorporateEnglishBaseline(language_code="en-US", transcript=full_text, status="READY", editable=True)
 
-            loc_json = loc_obj.model_dump_json()
-            corp_json = corp_obj.model_dump_json()
-
-            cursor.execute(
-                """
-                INSERT INTO answer_entries (thread_id, seq, e4b_transcript, gemma12b_output, local_language_json, corporate_english_json, recorded_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (thread_id, next_seq, e4b_transcript, gemma12b_output, loc_json, corp_json, recorded_at)
-            )
-
-            # Audit log
-            audit_payload = json.dumps({
-                "seq": next_seq,
-                "e4b_transcript": e4b_transcript,
-                "gemma12b_output": gemma12b_output,
-                "recorded_at": recorded_at
-            })
-            cursor.execute(
-                "INSERT INTO audit_log (timestamp, session_id, thread_id, action, payload) VALUES (?, ?, ?, ?, ?)",
-                (recorded_at, session_id, thread_id, "ADD_ANSWER", audit_payload)
-            )
+            if row:
+                row_id = row["id"]
+                cursor.execute(
+                    """
+                    UPDATE answer_entries 
+                    SET e4b_transcript = ?, gemma12b_output = ?, local_language_json = ?, corporate_english_json = ?, recorded_at = ?
+                    WHERE id = ?
+                    """,
+                    (full_text, full_text, loc_obj.model_dump_json(), corp_obj.model_dump_json(), recorded_at, row_id)
+                )
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO answer_entries (thread_id, seq, e4b_transcript, gemma12b_output, local_language_json, corporate_english_json, recorded_at)
+                    VALUES (?, 1, ?, ?, ?, ?, ?)
+                    """,
+                    (thread_id, full_text, full_text, loc_obj.model_dump_json(), corp_obj.model_dump_json(), recorded_at)
+                )
             conn.commit()
+        return self.get_session(session_id)
 
-            return AnswerEntry(
-                seq=next_seq,
-                e4b_transcript=e4b_transcript,
-                gemma12b_output=gemma12b_output,
-                local_language_baseline=loc_obj,
-                corporate_english_baseline=corp_obj,
-                recorded_at=recorded_at
+    def generate_ai_answer(self, session_id: str, thread_id: str, gemma_service) -> Session:
+        """
+        Generates an AI answer using the Finance Specialist (Systems Integration) persona,
+        and replaces the current draft text with the AI generated answer.
+        """
+        session = self.get_session(session_id)
+        target_thread = next((t for t in session.question_threads if t.thread_id == thread_id), None)
+        question_text = target_thread.question_text if target_thread else ""
+        lang_code = "en"
+
+        ai_text = gemma_service.generate_ai_answer(question_text, lang_code)
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id FROM answer_entries WHERE thread_id = ? ORDER BY seq ASC LIMIT 1",
+                (thread_id,)
             )
+            row = cursor.fetchone()
+            recorded_at = datetime.now(timezone.utc).isoformat()
+            loc_obj = LocalLanguageBaseline(transcript=ai_text, status="COMPILED")
+            corp_obj = CorporateEnglishBaseline(language_code="en-US", transcript=ai_text, status="READY", editable=True)
+
+            if row:
+                row_id = row["id"]
+                cursor.execute(
+                    """
+                    UPDATE answer_entries 
+                    SET e4b_transcript = ?, gemma12b_output = ?, local_language_json = ?, corporate_english_json = ?, recorded_at = ?
+                    WHERE id = ?
+                    """,
+                    (ai_text, ai_text, loc_obj.model_dump_json(), corp_obj.model_dump_json(), recorded_at, row_id)
+                )
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO answer_entries (thread_id, seq, e4b_transcript, gemma12b_output, local_language_json, corporate_english_json, recorded_at)
+                    VALUES (?, 1, ?, ?, ?, ?, ?)
+                    """,
+                    (thread_id, ai_text, ai_text, loc_obj.model_dump_json(), corp_obj.model_dump_json(), recorded_at)
+                )
+            conn.commit()
+        return self.get_session(session_id)
+
+    def adjust_answer(self, session_id: str, thread_id: str, instruction: str, gemma_service) -> Session:
+        """
+        Executes a natural language editing command against the active answer baseline.
+        Does NOT append the instruction text, but applies the edit action to the existing baseline.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, e4b_transcript, gemma12b_output FROM answer_entries WHERE thread_id = ? ORDER BY seq ASC LIMIT 1",
+                (thread_id,)
+            )
+            row = cursor.fetchone()
+            if row:
+                row_id = row["id"]
+                current_e4b = row["e4b_transcript"].strip()
+                current_gemma = row["gemma12b_output"].strip()
+
+                new_e4b = gemma_service.apply_edit_command(current_e4b, instruction)
+                new_gemma = gemma_service.apply_edit_command(current_gemma, instruction)
+
+                recorded_at = datetime.now(timezone.utc).isoformat()
+                loc_obj = LocalLanguageBaseline(transcript=new_e4b, status="COMPILED")
+                corp_obj = CorporateEnglishBaseline(language_code="en-US", transcript=new_gemma, status="READY", editable=True)
+
+                cursor.execute(
+                    """
+                    UPDATE answer_entries 
+                    SET e4b_transcript = ?, gemma12b_output = ?, local_language_json = ?, corporate_english_json = ?, recorded_at = ?
+                    WHERE id = ?
+                    """,
+                    (new_e4b, new_gemma, loc_obj.model_dump_json(), corp_obj.model_dump_json(), recorded_at, row_id)
+                )
+            conn.commit()
+        return self.get_session(session_id)
+
+    def delete_last_segment(self, session_id: str, thread_id: str) -> Session:
+        """
+        Deletes the last recorded segment/sentence from the active single baseline answer.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, e4b_transcript, gemma12b_output FROM answer_entries WHERE thread_id = ? ORDER BY seq ASC LIMIT 1",
+                (thread_id,)
+            )
+            row = cursor.fetchone()
+            if row:
+                row_id = row["id"]
+                e4b_text = row["e4b_transcript"].strip()
+                gemma_text = row["gemma12b_output"].strip()
+
+                def trim_last_segment(text: str) -> str:
+                    if not text:
+                        return ""
+                    # Split by sentence enders (. ! ?)
+                    import re
+                    parts = [p.strip() for p in re.split(r'(?<=[.!?])\s+', text) if p.strip()]
+                    if len(parts) > 1:
+                        return " ".join(parts[:-1])
+                    return ""
+
+                new_e4b = trim_last_segment(e4b_text)
+                new_gemma = trim_last_segment(gemma_text)
+
+                if not new_e4b and not new_gemma:
+                    cursor.execute("DELETE FROM answer_entries WHERE id = ?", (row_id,))
+                else:
+                    recorded_at = datetime.now(timezone.utc).isoformat()
+                    loc_obj = LocalLanguageBaseline(transcript=new_e4b, status="COMPILED")
+                    corp_obj = CorporateEnglishBaseline(language_code="en-US", transcript=new_gemma, status="READY", editable=True)
+
+                    cursor.execute(
+                        """
+                        UPDATE answer_entries 
+                        SET e4b_transcript = ?, gemma12b_output = ?, local_language_json = ?, corporate_english_json = ?, recorded_at = ?
+                        WHERE id = ?
+                        """,
+                        (new_e4b, new_gemma, loc_obj.model_dump_json(), corp_obj.model_dump_json(), recorded_at, row_id)
+                    )
+            conn.commit()
+        return self.get_session(session_id)
+
+    def add_answer(self, session_id: str, thread_id: str, e4b_transcript: str, gemma12b_output: str, local_baseline: Optional[LocalLanguageBaseline] = None, corporate_baseline: Optional[CorporateEnglishBaseline] = None) -> AnswerEntry:
+        """
+        Appends newly recorded voice/text to the single continuous baseline answer for the question thread.
+        Executes commands if command phrase is detected.
+        """
+        clean_input = e4b_transcript.strip().lower()
+        
+        # Check for voice edit commands
+        if any(cmd in clean_input for cmd in ["delete last segment", "delete last sentence", "delete last recorded segment", "undo last segment", "remove last segment", "delete last part"]):
+            logger.info(f"Voice Command Detected: 'Delete Last Segment' for thread {thread_id}")
+            self.delete_last_segment(session_id, thread_id)
+            session = self.get_session(session_id)
+            target_thread = next((t for t in session.question_threads if t.thread_id == thread_id), None)
+            if target_thread and target_thread.answers:
+                return target_thread.answers[0]
+            return AnswerEntry(seq=1, e4b_transcript="", gemma12b_output="", recorded_at=datetime.now(timezone.utc).isoformat())
+
+        if any(cmd in clean_input for cmd in ["clear answer", "delete answer", "reset answer", "clear thread"]):
+            logger.info(f"Voice Command Detected: 'Clear Answer' for thread {thread_id}")
+            self.clear_thread_answers(session_id, thread_id)
+            return AnswerEntry(seq=1, e4b_transcript="", gemma12b_output="", recorded_at=datetime.now(timezone.utc).isoformat())
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            recorded_at = datetime.now(timezone.utc).isoformat()
+
+            # Check if single baseline answer already exists
+            cursor.execute(
+                "SELECT id, e4b_transcript, gemma12b_output FROM answer_entries WHERE thread_id = ? ORDER BY seq ASC LIMIT 1",
+                (thread_id,)
+            )
+            existing = cursor.fetchone()
+
+            if existing:
+                row_id = existing["id"]
+                old_e4b = existing["e4b_transcript"].strip()
+                old_gemma = existing["gemma12b_output"].strip()
+
+                combined_e4b = f"{old_e4b} {e4b_transcript}".strip() if old_e4b else e4b_transcript.strip()
+                combined_gemma = f"{old_gemma} {gemma12b_output}".strip() if old_gemma else gemma12b_output.strip()
+
+                loc_obj = local_baseline or LocalLanguageBaseline(transcript=combined_e4b, status="COMPILED")
+                corp_obj = corporate_baseline or CorporateEnglishBaseline(language_code="en-US", transcript=combined_gemma, status="READY", editable=True)
+
+                cursor.execute(
+                    """
+                    UPDATE answer_entries 
+                    SET e4b_transcript = ?, gemma12b_output = ?, local_language_json = ?, corporate_english_json = ?, recorded_at = ?
+                    WHERE id = ?
+                    """,
+                    (combined_e4b, combined_gemma, loc_obj.model_dump_json(), corp_obj.model_dump_json(), recorded_at, row_id)
+                )
+
+                audit_payload = json.dumps({"action": "APPEND_SEGMENT", "added": e4b_transcript, "combined": combined_e4b})
+                cursor.execute(
+                    "INSERT INTO audit_log (timestamp, session_id, thread_id, action, payload) VALUES (?, ?, ?, ?, ?)",
+                    (recorded_at, session_id, thread_id, "UPDATE_BASELINE", audit_payload)
+                )
+                conn.commit()
+
+                return AnswerEntry(
+                    seq=1,
+                    e4b_transcript=combined_e4b,
+                    gemma12b_output=combined_gemma,
+                    local_language_baseline=loc_obj,
+                    corporate_english_baseline=corp_obj,
+                    recorded_at=recorded_at
+                )
+            else:
+                loc_obj = local_baseline or LocalLanguageBaseline(transcript=e4b_transcript, status="COMPILED")
+                corp_obj = corporate_baseline or CorporateEnglishBaseline(language_code="en-US", transcript=gemma12b_output, status="READY", editable=True)
+
+                cursor.execute(
+                    """
+                    INSERT INTO answer_entries (thread_id, seq, e4b_transcript, gemma12b_output, local_language_json, corporate_english_json, recorded_at)
+                    VALUES (?, 1, ?, ?, ?, ?, ?)
+                    """,
+                    (thread_id, e4b_transcript, gemma12b_output, loc_obj.model_dump_json(), corp_obj.model_dump_json(), recorded_at)
+                )
+                audit_payload = json.dumps({"action": "CREATE_BASELINE", "initial": e4b_transcript})
+                cursor.execute(
+                    "INSERT INTO audit_log (timestamp, session_id, thread_id, action, payload) VALUES (?, ?, ?, ?, ?)",
+                    (recorded_at, session_id, thread_id, "ADD_ANSWER", audit_payload)
+                )
+                conn.commit()
+
+                return AnswerEntry(
+                    seq=1,
+                    e4b_transcript=e4b_transcript,
+                    gemma12b_output=gemma12b_output,
+                    local_language_baseline=loc_obj,
+                    corporate_english_baseline=corp_obj,
+                    recorded_at=recorded_at
+                )
 
     def consolidate_question_thread(self, session_id: str, thread_id: str, gemma_service) -> Session:
         """
